@@ -60,6 +60,15 @@ Treelite supports multiple model file formats.
    :project: treelite
    :content-only:
 
+Model exporter interface (EXPERIMENTAL)
+---------------------------------------
+Use the following functions to save decision tree ensemble models as files.
+This feature is experimental.
+
+.. doxygengroup:: Model_exporter
+   :project: treelite
+   :content-only:
+
 Model builder interface
 -----------------------
 Use the following functions to incrementally build decisio n tree ensemble
