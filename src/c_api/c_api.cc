@@ -14,6 +14,8 @@
 #include <dmlc/json.h>
 #include <dmlc/thread_local.h>
 #include <memory>
+#include <sstream>
+#include <stack>
 #include <unordered_map>
 #include <algorithm>
 #include "./c_api_error.h"
@@ -43,6 +45,10 @@ struct TreeliteAPIThreadLocalEntry {
 // define threadlocal store for returning information
 using TreeliteAPIThreadLocalStore
   = dmlc::ThreadLocalStore<TreeliteAPIThreadLocalEntry>;
+
+// forward declaration
+void DumpTree(const treelite::Tree& tree, int nid, int depth,
+              dmlc::ostream* os);
 
 }  // namespace anonymous
 
@@ -441,6 +447,50 @@ int TreeliteFreeModel(ModelHandle handle) {
   API_END();
 }
 
+int TreeliteExportLightGBMModel(ModelHandle handle,
+                                const char* filename) {
+  API_BEGIN();
+  Model* model = static_cast<Model*>(handle);
+  frontend::ExportLightGBMModel(*model, filename);
+  API_END();
+}
+
+int TreeliteExportJSONModel(ModelHandle handle,
+                            const char* filename) {
+  API_BEGIN();
+  Model* model = static_cast<Model*>(handle);
+  std::unique_ptr<dmlc::Stream> fo(dmlc::Stream::Create(filename, "w"));
+  dmlc::ostream os(fo.get());
+  os << "{\"name\": \"tree\", "
+     << "\"num_class\": " << model->num_output_group << ", "
+     << "\"num_tree_per_iteration\": " << model->num_output_group << ", "
+     << "\"label_index\": 0, "
+     << "\"max_feature_idx\": " << model->num_feature - 1 << ", "
+     << "\"tree_info\": [" << std::endl;
+  const size_t ntree = model->trees.size();
+  for (size_t tree_id = 0; tree_id < ntree; ++tree_id) {
+    const treelite::Tree& tree = model->trees[tree_id];
+    int num_leaves = 0;
+    {
+      for (int nid = 0; nid < tree.num_nodes; ++nid) {
+        if (tree[nid].is_leaf()) {
+          ++num_leaves;
+        }
+      }
+    }
+    os << "  {\"tree_index\": " << tree_id << ", "
+       <<    "\"num_leaves\": " << num_leaves << ", "
+       <<    "\"num_cat\": 0, "
+       <<    "\"tree_structure\": " << std::endl;
+    DumpTree(tree, 0, 0, &os);
+    os << std::endl << "  }" << ((tree_id < ntree - 1) ? "," : "") << std::endl;
+  }
+  os << "]}" << std::endl;
+  // force flush
+  os.set_stream(nullptr);
+  API_END();
+}
+
 int TreeliteCreateTreeBuilder(TreeBuilderHandle* out) {
   API_BEGIN();
   auto builder = new frontend::TreeBuilder();
@@ -605,3 +655,53 @@ int TreeliteModelBuilderCommitModel(ModelBuilderHandle handle,
   }
   API_END();
 }
+
+namespace {
+
+void DumpTree(const treelite::Tree& tree, int nid, int depth,
+              dmlc::ostream* os) {
+  dmlc::ostream& os_ = *os;
+  if (depth > 0) {
+    os_ << std::endl;
+  }
+  for (int i = 0; i < depth + 2; ++i) {
+    os_ << "  ";
+  }
+  if (tree[nid].is_leaf()) {
+    const tl_float leaf_value = tree[nid].leaf_value();
+    os_ << "{\"leaf_value\": " << leaf_value << "}";
+  } else {
+    CHECK(tree[nid].split_type() == treelite::SplitFeatureType::kNumerical)
+          << "For the time being, trees with categorical splits cannot be "
+          << "exported in JSON format.";
+    os_ << "{ \"split_feature\": " << tree[nid].split_index()
+        << ", \"threshold\": ";
+    {
+      const tl_float threshold = tree[nid].threshold();
+      if (std::isfinite(threshold)) {
+        os_ << threshold;
+      } else {
+        os_ << ((threshold > 0) ? "1e300" : "-1e300");
+      }
+    }
+    os_ << ", \"decision_type\": \""
+           << semantic::OpName(tree[nid].comparison_op()) << "\""
+        << ", \"default_left\": "
+           << (tree[nid].default_left() ? "true" : "false")
+        << ", \"left_child\": ";
+    DumpTree(tree, tree[nid].cleft(), depth + 1, &os_);
+    os_ << "," << std::endl;
+    for (int i = 0; i < depth + 2; ++i) {
+      os_ << "  ";
+    }
+    os_ << "  \"right_child\": ";
+    DumpTree(tree, tree[nid].cright(), depth + 1, &os_);
+    os_ << std::endl;
+    for (int i = 0; i < depth + 2; ++i) {
+      os_ << "  ";
+    }
+    os_ << "}";
+  }
+}
+
+}  // namespace anonymous

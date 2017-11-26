@@ -277,6 +277,30 @@ TREELITE_DLL int TreeliteFreeModel(ModelHandle handle);
 /*! \} */
 
 /*!
+ * \defgroup model_exporter
+ * Model exporter (dumper) interface: save trees to disk (EXPERIMENTAL)
+ * \{
+ */
+/*!
+ * \brief export a model using the model file format for LightGBM
+ *        (Microsoft/LightGBM).
+ * \param handle model to export
+ * \param filename name of model file
+ * \return 0 for success, -1 for failure
+ */
+TREELITE_DLL int TreeliteExportLightGBMModel(ModelHandle handle,
+                                             const char* filename);
+/*!
+ * \brief export a model in JSON format.
+ * \param handle model to export
+ * \param filename name of model file
+ * \return 0 for success, -1 for failure
+ */
+TREELITE_DLL int TreeliteExportJSONModel(ModelHandle handle,
+                                         const char* filename);
+/*! \} */
+
+/*!
  * \defgroup model_builder
  * Model builder interface: build trees incrementally
  * \{

@@ -52,6 +52,17 @@ Model LoadXGBoostModel(const void* buf, size_t len);
 Model LoadProtobufModel(const char* filename);
 
 //--------------------------------------------------------------------------
+// model exporter interface: export model as a file in disk (EXPERIMENTAL)
+//--------------------------------------------------------------------------
+/*!
+ * \brief export a model using the model file format for LightGBM
+ *        (Microsoft/LightGBM).
+ * \param model model to export
+ * \param filename name of model file
+ */
+void ExportLightGBMModel(const Model& model, const char* filename);
+
+//--------------------------------------------------------------------------
 // model builder interface: build trees incrementally
 //--------------------------------------------------------------------------
 struct TreeBuilderImpl;   // forward declaration

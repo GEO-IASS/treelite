@@ -324,6 +324,37 @@ class Model(object):
                         + '{lightgbm, xgboost, protobuf}')
     return Model(handle)
 
+  def save(self, filename, model_format):
+    """
+    Save a tree ensemble model to a file
+
+    Parameters
+    ----------
+    filename : :py:class:`str <python:str>`
+        path to model file
+    model_format : :py:class:`str <python:str>`
+        model file format. Must be 'lightgbm' or 'json' (EXPERIMENTAL)
+
+    Example
+    -------
+
+    .. code-block:: python
+
+       model.save('lightgbm_model.txt', 'lightgbm')
+    """
+    if not _isascii(model_format):
+      raise ValueError('model_format parameter must be an ASCII string')
+    model_format = model_format.lower()
+    if model_format == 'lightgbm':
+      _check_call(_LIB.TreeliteExportLightGBMModel(self.handle,
+                                                   c_str(filename)))
+    elif model_format == 'json':
+      _check_call(_LIB.TreeliteExportJSONModel(self.handle,
+                                               c_str(filename)))
+    else:
+      raise ValueError('Unknown model_format: must be one of ' \
+                        + '{lightgbm, json}')
+
 class ModelBuilder(object):
   """
   Builder class for tree ensemble model: provides tools to iteratively build
